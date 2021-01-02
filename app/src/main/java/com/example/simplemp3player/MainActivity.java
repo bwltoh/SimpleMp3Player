@@ -188,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Uri uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
         String[] projection = {MediaStore.Audio.AudioColumns.DATA,
                 MediaStore.Audio.ArtistColumns.ARTIST};
-        //this line well bring all audio files on device
+       
         Cursor cursor = this.getContentResolver().query(uri, projection, MediaStore.Files.FileColumns.MIME_TYPE + "=?",
                 new String[]{MimeTypeMap.getSingleton().getMimeTypeFromExtension("mp3")}, null);
 
