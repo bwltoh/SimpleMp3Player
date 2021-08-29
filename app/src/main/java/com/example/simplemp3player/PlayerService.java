@@ -179,10 +179,7 @@ public class PlayerService extends Service {
 
         if (SDK_INT>= Build.VERSION_CODES.O){
 
-
-
             builder=new NotificationCompat.Builder(context,CHANNEL_ID);
-
 
         }else
         {
