@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Simple Mp3 Player</string>
+    <string name="play_all">play all</string>
+    <string name="album_image">album image</string>
+    <string name="placeholder">--:--</string>
+    <string name="previous">previous</string>
+    <string name="play">play</string>
+    <string name="next">next</string>
 </resources>

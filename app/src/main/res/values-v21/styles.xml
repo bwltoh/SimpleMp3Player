@@ -3,8 +3,8 @@
 
     <style name="SeekBar_Style" parent="Widget.AppCompat.SeekBar">
         <item name="android:progressTint">@color/colorRed</item>
-        <item name="android:progressBackgroundTint">@color/colorPrimary</item>
-        <item name="android:thumbTint">@android:color/holo_blue_dark</item>
+        <item name="android:progressBackgroundTint">@color/gray</item>
+        <item name="android:thumbTint">@color/colorRed</item>
     </style>
 
 

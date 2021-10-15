@@ -18,18 +18,30 @@ public class AudioFile implements Parcelable {
     };
     String data;
     String artist;
+    String songTitle;
+    public String getSongTitle() {
+        return songTitle;
+    }
+
+    public void setSongTitle(String songTitle) {
+        this.songTitle = songTitle;
+    }
+
+
 
     public AudioFile() {
     }
 
-    public AudioFile(String data, String artist) {
+    public AudioFile(String data, String artist,String songTitle) {
         this.data = data;
         this.artist = artist;
+        this.songTitle = songTitle;
     }
 
     protected AudioFile(Parcel in) {
         data = in.readString();
         artist = in.readString();
+        songTitle = in.readString();
     }
 
     public String getData() {
@@ -57,5 +69,6 @@ public class AudioFile implements Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeString(data);
         dest.writeString(artist);
+        dest.writeString(songTitle);
     }
 }

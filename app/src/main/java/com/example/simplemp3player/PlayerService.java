@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.widget.RemoteViews;
 
 import androidx.core.app.NotificationCompat;
@@ -23,36 +24,34 @@ import static android.os.Build.VERSION.SDK_INT;
 public class PlayerService extends Service {
 
 
-    IBinder binder=new sBinder();
-    simplePlayer simplePlayer;
-    ArrayList<AudioFile> audioFiles;
-    boolean isForeground=false;
-    boolean isPlay;
-    Handler handler=new Handler();
-    String CHANNEL_ID="244";
-    NotificationManager nm;
-    int i;
+    final String CHANNEL_ID = "244";
+    IBinder               binder       = new sBinder();
+    simplePlayer          simplePlayer;
+    ArrayList<AudioFile>  audioFiles;
+    boolean               isForeground = false;
+    boolean               isPlay       = false;
+    Handler               handler      = new Handler(Looper.getMainLooper());
+    NotificationManager   nm;
+    int                   i;
     OnPlayerEventListener onPlayerEventListener;
 
-    int currentdur;
-    int dur;
+    int progressDuration;
+    int totalDuration;
+
     public PlayerService() {
 
-        simplePlayer=new simplePlayer(this);
+        simplePlayer = new simplePlayer(this);
 
     }
 
-    public void setOnPlayerEventListener(OnPlayerEventListener onPlayerEventListener){
-        this.onPlayerEventListener=onPlayerEventListener;
-    }
 
     @Override
     public void onCreate() {
         super.onCreate();
-        NotificationChannel channel=null;
-        nm= (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        NotificationChannel channel;
+        nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (SDK_INT >= Build.VERSION_CODES.O) {
-            channel= new NotificationChannel(CHANNEL_ID,"SMP",NotificationManager.IMPORTANCE_LOW);
+            channel = new NotificationChannel(CHANNEL_ID, "SMP", NotificationManager.IMPORTANCE_LOW);
             nm.createNotificationChannel(channel);
         }
 
@@ -61,134 +60,139 @@ public class PlayerService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        Runnable runnable=new Runnable() {
+        Runnable runnable = new Runnable() {
             @Override
             public void run() {
-                 currentdur=simplePlayer.getSongCurrentDuration();
+                progressDuration = simplePlayer.getSongProgressDuration();
 
-                 dur=simplePlayer.getSongDuration();
+                totalDuration = simplePlayer.getSongTotalDuration();
 
-                 handler.postDelayed(this,1000);
+                handler.postDelayed(this, 100);
             }
         };
 
 
-
-        Bundle bundle= intent.getExtras();
-        if (bundle!=null)
+        Bundle bundle = intent.getExtras();
+        if (bundle != null)
             if (!bundle.isEmpty()) {
                 audioFiles = new ArrayList<>();
                 audioFiles = bundle.getParcelableArrayList("songs");
-                  i = bundle.getInt("running_song");
+                i = bundle.getInt("running_song");
             }
 
-        if ("com.example.simplemp3player.play".equals(intent.getAction())){
-            simplePlayer.init(audioFiles);
+        if ("com.example.simplemp3player.init".equals(intent.getAction())) {
+            simplePlayer.init();
+        } else if ("com.example.simplemp3player.play".equals(intent.getAction())) {
+
             simplePlayer.setCurrentPosition(i);
             simplePlayer.play();
-            isPlay=true;
+            updateNotificationAndPlayingState(true, true, runnable);
 
-            handler.postDelayed(runnable,1000);
-            if (!isForeground){
+            if (!isForeground) {
 
-                startForeground(132, getNotification(this,isPlay));
-                isForeground=true;
+                startForeground(132, getNotification(this, isPlay));
+                isForeground = true;
             }
-            nm.notify(132,getNotification(this,isPlay));
-
-        }else if("com.example.simplemp3player.replay".equals(intent.getAction())) {
+        } else if ("com.example.simplemp3player.replay".equals(intent.getAction())) {
             simplePlayer.resume();
-            isPlay=true;
-            nm.notify(132,getNotification(this,isPlay));
-            handler.removeCallbacks(runnable);
-            handler.postDelayed(runnable,1000);
-            onPlayerEventListener.onPlayerPlay(isPlay);
 
-        }else if ("com.example.simplemp3player.pause".equals(intent.getAction())){
+            updateNotificationAndPlayingState(false, true, runnable);
+            if (!isForeground) {
+
+                startForeground(132, getNotification(this, isPlay));
+                isForeground = true;
+            }
+
+        } else if ("com.example.simplemp3player.pause".equals(intent.getAction())) {
             simplePlayer.pause();
-            isPlay=false;
-            nm.notify(132,getNotification(this,isPlay));
-            handler.removeCallbacks(runnable);
-            handler.postDelayed(runnable,1000);
-            onPlayerEventListener.onPlayerPlay(isPlay);
-        }else if ("com.example.simplemp3player.next".equals(intent.getAction())){
+
+            updateNotificationAndPlayingState(false, false, runnable);
+
+        } else if ("com.example.simplemp3player.next".equals(intent.getAction())) {
 
             simplePlayer.nextSong();
-            isPlay=true;
-            nm.notify(132,getNotification(this,isPlay));
-            handler.removeCallbacks(runnable);
-            handler.postDelayed(runnable,1000);
 
-        }else if ("com.example.simplemp3player.prev".equals(intent.getAction())){
+            updateNotificationAndPlayingState(true, true, runnable);
+
+
+        } else if ("com.example.simplemp3player.prev".equals(intent.getAction())) {
 
             simplePlayer.previousSong();
-            isPlay=true;
-            nm.notify(132,getNotification(this,isPlay));
-            handler.removeCallbacks(runnable);
-            handler.postDelayed(runnable,1000);
 
-        }else if ("com.example.simplemp3player.seek_to".equals(intent.getAction())){
+            updateNotificationAndPlayingState(true, true, runnable);
 
-            simplePlayer.setSeekPosition( bundle.getInt("seek_to"));
+        } else if ("com.example.simplemp3player.seek_to".equals(intent.getAction())) {
+
+            if (bundle != null) {
+                simplePlayer.setSeekPosition(bundle.getInt("seek_to"));
+            }
         }
-
-
 
 
         return START_NOT_STICKY;
     }
 
+    private void updateNotificationAndPlayingState(boolean songChanged, boolean playState, Runnable runnable) {
+        isPlay = playState;
+        nm.notify(132, getNotification(this, isPlay));
+        handler.removeCallbacks(runnable);
+        handler.postDelayed(runnable, 100);
+        if (songChanged) {
+            onPlayerEventListener.onPlayerPlay(isPlay);
+            onPlayerEventListener.onSongChanged(simplePlayer.getSongTilte(), getCurrent_position());
 
+        } else
+            onPlayerEventListener.onPlayerPlay(isPlay);
 
-    private Notification getNotification(Context context,boolean isPlay){
+    }
+
+    private Notification getNotification(Context context, boolean isPlay) {
 
         NotificationCompat.Builder builder;
 
 
-
-        Intent intent=new Intent(context,PlayerService.class);
+        Intent intent = new Intent(context, PlayerService.class);
         intent.setAction("com.example.simplemp3player.next");
-        PendingIntent nextPendingIntent=PendingIntent.getService(context,1,intent,PendingIntent.FLAG_CANCEL_CURRENT);//PendingIntent.FLAG_UPDATE_CURRENT
+        PendingIntent nextPendingIntent = PendingIntent.getService(context, 1, intent, PendingIntent.FLAG_CANCEL_CURRENT);//PendingIntent.FLAG_UPDATE_CURRENT
 
-        Intent intent1=new Intent(context,PlayerService.class);
+        Intent intent1 = new Intent(context, PlayerService.class);
         intent1.setAction("com.example.simplemp3player.prev");
-        PendingIntent prevPendingIntent=PendingIntent.getService(context,2,intent1,PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent prevPendingIntent = PendingIntent.getService(context, 2, intent1, PendingIntent.FLAG_CANCEL_CURRENT);
 
 
-        Intent intent3=new Intent(context,PlayerService.class);
+        Intent intent3 = new Intent(context, PlayerService.class);
         intent3.setAction("com.example.simplemp3player.pause");
-        PendingIntent pausePendingIntent=PendingIntent.getService(context,4,intent3,PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent pausePendingIntent = PendingIntent.getService(context, 4, intent3, PendingIntent.FLAG_CANCEL_CURRENT);
 
 
-        Intent intent2=new Intent(context,PlayerService.class);
+        Intent intent2 = new Intent(context, PlayerService.class);
         intent2.setAction("com.example.simplemp3player.replay");
-        PendingIntent playPendingIntent=PendingIntent.getService(context,3,intent2,PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent playPendingIntent = PendingIntent.getService(context, 3, intent2, PendingIntent.FLAG_CANCEL_CURRENT);
 
-        RemoteViews remoteView=new RemoteViews(context.getPackageName(),
+        RemoteViews remoteView = new RemoteViews(context.getPackageName(),
                 R.layout.media_controll);
 
 
-       String tilte = simplePlayer.getSongTilte();
-       remoteView.setTextViewText(R.id.title,tilte);
-        remoteView.setOnClickPendingIntent(R.id.next,nextPendingIntent);
-        remoteView.setOnClickPendingIntent(R.id.prev,prevPendingIntent);
-        remoteView.setOnClickPendingIntent(R.id.pause, isPlay?pausePendingIntent:playPendingIntent);
+        String tilte = getTitle();
+        remoteView.setTextViewText(R.id.title, tilte);
+        remoteView.setOnClickPendingIntent(R.id.next, nextPendingIntent);
+        remoteView.setOnClickPendingIntent(R.id.prev, prevPendingIntent);
+        remoteView.setOnClickPendingIntent(R.id.pause, isPlay ? pausePendingIntent : playPendingIntent);
 
-        remoteView.setImageViewResource(R.id.pause,isPlay?R.drawable.ic_pause:R.drawable.ic_play);
+        remoteView.setImageViewResource(R.id.pause, isPlay ? R.drawable.ic_pause_black : R.drawable.ic_play_black);
 
 
-        if (SDK_INT>= Build.VERSION_CODES.O){
+        if (SDK_INT >= Build.VERSION_CODES.O) {
 
-            builder=new NotificationCompat.Builder(context,CHANNEL_ID);
+            builder = new NotificationCompat.Builder(context, CHANNEL_ID);
 
-        }else
-        {
+        } else {
             builder = new NotificationCompat.Builder(context);
 
         }
 
 
-        return builder.setDefaults(Notification.DEFAULT_ALL)
+        return builder
                 .setSmallIcon(R.drawable.ic_stat_new_message)
                 .setCustomContentView(remoteView)
                 .setChannelId(CHANNEL_ID)
@@ -200,31 +204,53 @@ public class PlayerService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-       return binder;
+        return binder;
     }
 
     @Override
     public void onDestroy() {
 
-          stopForeground(true);
-          simplePlayer.stop();
+        stopForeground(true);
+        simplePlayer.stop();
         super.onDestroy();
     }
 
-    public int getCurrentdur(){
-        return currentdur;
+    public void setOnPlayerEventListener(OnPlayerEventListener onPlayerEventListener) {
+        this.onPlayerEventListener = onPlayerEventListener;
     }
 
-    public int getDur(){
-        return  dur;
+    public void sendCurrentSongInfo() {
+        onPlayerEventListener.onSongChanged(getTitle(), getCurrent_position());
     }
 
-    public class sBinder extends Binder{
+    public boolean isPlay() {
+        return isPlay;
+    }
 
+    public int getCurrent_position() {
+        return simplePlayer.getCurrentPosition();
+    }
 
+    public int getAudioProgressDuration() {
+        return progressDuration;
+    }
 
-        public PlayerService getService(){
-            return   PlayerService.this;
+    public int getAudioTotalDuration() {
+        return totalDuration;
+    }
+
+    public String getTitle() {
+        return simplePlayer.getSongTilte();
+    }
+
+    public void setPlayList(ArrayList<AudioFile> audioFiles) {
+        simplePlayer.setSongs(audioFiles);
+    }
+
+    public class sBinder extends Binder {
+
+        public PlayerService getService() {
+            return PlayerService.this;
         }
 
     }
